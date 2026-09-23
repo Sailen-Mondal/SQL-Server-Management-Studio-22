@@ -1,0 +1,7 @@
+material_id,material_name,material_category,unit,reorder_level,hazardous_flag
+101,Titanium Dioxide,Pigment,KG,750.00,0
+102,Acrylic Resin,Binder,KG,300.00,0
+103,Calcium Carbonate,Filler,KG,600.00,0
+104,Xylene,Solvent,L,800.00,1
+105,Talc Powder,Filler,KG,450.00,0
+106,Iron Oxide Red,Pigment,KG,550.00,0
