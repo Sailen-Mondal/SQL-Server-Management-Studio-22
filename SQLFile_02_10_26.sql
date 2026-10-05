@@ -1,7 +1,7 @@
 -- =================================================================================================
 -- File: SQLFile_02_10_26.sql
 -- Date: 02-Oct-2026
--- Topic: Stored Procedures in SQL Server (BikeStores Database Assignments)
+-- Topic: Stored Procedures in SQL Server 
 -- =================================================================================================
 
 USE BikeStores;
@@ -62,12 +62,11 @@ GO
 
 
 -- =================================================================================================
--- PART 2: BIPLAB SIR (MCC) ASSIGNMENTS - STORED PROCEDURES
+-- PART 2: ASSIGNMENTS - STORED PROCEDURES
 -- =================================================================================================
 
 ----------------------------------------------------------------------------------------------------
--- Task 1:
--- [1:28 pm, 2/10/2026] BIPLAB Sir (MCC): 
+-- Task 1: 
 -- Create a stored procedure to input store and display product count for each product.
 ----------------------------------------------------------------------------------------------------
 CREATE OR ALTER PROCEDURE [dbo].[usp_GetProductStockByStore]
@@ -104,7 +103,6 @@ GO
 
 ----------------------------------------------------------------------------------------------------
 -- Task 2:
--- [1:51 pm, 2/10/2026] BIPLAB Sir (MCC): 
 -- Get Orders by Customer (Basic Input Parameter)
 -- Goal: Retrieve all orders placed by a specific customer.
 ----------------------------------------------------------------------------------------------------
@@ -151,7 +149,6 @@ GO
 
 ----------------------------------------------------------------------------------------------------
 -- Task 3:
--- [1:51 pm, 2/10/2026] BIPLAB Sir (MCC): 
 -- Get Order Details & Line Items (JOIN Query)
 -- Goal: Return a combined view of an order along with its itemized list and total price per item.
 ----------------------------------------------------------------------------------------------------
@@ -195,7 +192,6 @@ GO
 
 ----------------------------------------------------------------------------------------------------
 -- Task 4:
--- [1:51 pm, 2/10/2026] BIPLAB Sir (MCC): 
 -- Get Total Revenue for an Order (OUTPUT Parameter)
 -- Goal: Calculate the net total price of an entire order and return it as an output variable 
 --       for use in other scripts.
@@ -231,7 +227,6 @@ GO
 
 ----------------------------------------------------------------------------------------------------
 -- Task 5:
--- [1:52 pm, 2/10/2026] BIPLAB Sir (MCC): 
 -- Update Order Shipping Date (DML Statement)
 -- Goal: Update the shipped_date and status of an order safely.
 ----------------------------------------------------------------------------------------------------
@@ -303,4 +298,98 @@ EXEC [dbo].[usp_UpdateOrderShippingDate]
 SELECT order_id, order_date, shipped_date, order_status 
 FROM sales.orders 
 WHERE order_id = 1;
+GO
+
+
+----------------------------------------------------------------------------------------------------
+-- Task 6:
+-- Store Inventory Search & Low-Stock Alert
+-- Goal: Retrieve all stock levels for a specific store, filtering by items that are below a reorder threshold, while including store contact information.
+----------------------------------------------------------------------------------------------------
+CREATE OR ALTER PROCEDURE [dbo].[usp_GetLowStockByStore]
+    @store_id INT,
+    @threshold INT = 10
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    -- Verify store existence
+    IF NOT EXISTS (SELECT 1 FROM sales.stores WHERE store_id = @store_id)
+    BEGIN
+        PRINT 'Store ID ' + CAST(@store_id AS VARCHAR(10)) + ' does not exist.';
+        RETURN;
+    END;
+
+    SELECT 
+        st.store_id,
+        st.store_name,
+        st.phone,
+        st.email,
+        p.product_id,
+        p.product_name,
+        ISNULL(s.quantity, 0) AS stock_quantity
+    FROM production.stocks s
+    INNER JOIN production.products p ON s.product_id = p.product_id
+    INNER JOIN sales.stores st ON s.store_id = st.store_id
+    WHERE s.store_id = @store_id
+      AND ISNULL(s.quantity, 0) < @threshold
+    ORDER BY s.quantity ASC;
+END;
+GO
+
+-- Test Task 6:
+EXEC [dbo].[usp_GetLowStockByStore] @store_id = 1, @threshold = 10;
+GO
+
+
+----------------------------------------------------------------------------------------------------
+-- Task 7:
+-- Multi-Store Product Stock Aggregation
+-- Goal: Summarize the distribution of a given product across all stores, returning store details alongside inventory numbers and total global stock as an OUTPUT parameter.
+----------------------------------------------------------------------------------------------------
+CREATE OR ALTER PROCEDURE [dbo].[usp_GetProductStockDistribution]
+    @product_id INT,
+    @total_global_stock INT OUTPUT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    -- Verify product existence
+    IF NOT EXISTS (SELECT 1 FROM production.products WHERE product_id = @product_id)
+    BEGIN
+        PRINT 'Product ID ' + CAST(@product_id AS VARCHAR(10)) + ' does not exist.';
+        SET @total_global_stock = 0;
+        RETURN;
+    END;
+
+    -- Calculate total global stock for the output parameter
+    SELECT @total_global_stock = ISNULL(SUM(quantity), 0)
+    FROM production.stocks
+    WHERE product_id = @product_id;
+
+    -- Return distribution across all stores
+    SELECT 
+        st.store_id,
+        st.store_name,
+        st.city,
+        st.state,
+        p.product_id,
+        p.product_name,
+        ISNULL(s.quantity, 0) AS stock_quantity
+    FROM sales.stores st
+    INNER JOIN production.products p ON p.product_id = @product_id
+    LEFT JOIN production.stocks s ON st.store_id = s.store_id AND s.product_id = p.product_id
+    ORDER BY st.store_id;
+END;
+GO
+
+-- Test Task 7 (Executing with OUTPUT parameter):
+DECLARE @global_stock INT;
+
+EXEC [dbo].[usp_GetProductStockDistribution]
+    @product_id = 1,
+    @total_global_stock = @global_stock OUTPUT;
+
+SELECT 1 AS product_id, @global_stock AS total_global_stock;
+PRINT 'Total Global Stock across all stores: ' + CAST(@global_stock AS VARCHAR(10));
 GO
